@@ -16,5 +16,4 @@ Per le informazioni di maggior dettaglio tecnico si rimanda alla seguente url:
 
 Per informazioni: Cesare Gerbino (cesare.gerbino@gmail.com).
 
-Il codice dell'applicazione e' disponibile con licenza Licenza MIT Copyright (c) [2014] (rif. https://it.wikipedia.org/wiki/Licenza_MIT)
-
+Il codice dell'applicazione e' disponibile con licenza [Licenza MIT] (https://opensource.org/licenses/MIT) Copyright (c) [2014] - rif. [https://it.wikipedia.org/wiki/Licenza_MIT] (https://it.wikipedia.org/wiki/Licenza_MIT)
