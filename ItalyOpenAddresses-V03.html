@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Open addresses in Italy: who has them, how many and where they are?</title>
+    <link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet-0.7.2/leaflet.css"/>
+    <script src="http://cdn.leafletjs.com/leaflet-0.7.2/leaflet-src.js"></script>
+    <script src="tools/OSMBuildings/osmbuildings-0.1.9a/tests/scripts.js.php?engine=Leaflet"></script>
+    <script src="http://code.jquery.com/jquery-1.11.0.min.js"></script>
+    <style>
+      body {
+         padding: 0;
+         margin: 0;
+      }
+      html, body, #map {
+                     height: 100%;
+      }
+
+
+      #infodiv{
+               position:fixed;
+               left:2px;
+               bottom:20px;
+	       font-size: 11px;
+               z-index:9999;
+               border-radius: 10px;
+               -moz-border-radius: 10px;
+               -webkit-border-radius: 10px;
+               border: 2px solid #808080;
+               background-color:#f2eeee;
+               padding:5px;
+               box-shadow: 0 3px 14px rgba(0,0,0,0.4)
+      }
+
+
+    </style>
+</head>
+<body>
+   <div id="map"></div>
+    <script>
+      // *** declare global variables ... ***
+      var addressPCN;
+      var addressPCN1;
+      var addressPCN2;
+      var addressPCN3;
+      var currentExtent;
+      var TOC;
+      var isOnMap = 0;
+
+      var geojsonMarkerOptions = {
+                 radius: 8,
+                 fillColor: "#2c60cf",
+                 color: "#000",
+                 weight: 1,
+                 opacity: 1,
+                 fillOpacity: 0.3
+      };
+
+      // *** create OSM layer ... ***
+      var osm = new L.TileLayer('http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        { attribution: 'Map data <a href="http://openstreetmap.org">OpenStreetMap</a> contributors' }
+        );
+
+      // *** create PCN AGEA aerial layer (WMS) ... ***
+      var pcnAgea = L.tileLayer.wms("http://wms.pcn.minambiente.it/ogc?map=/ms_ogc/WMS_v1.3/raster/ortofoto_colore_12.map&", {
+       layers: 'OI.ORTOIMMAGINI.2012',
+       format: 'image/jpeg',
+       attribution: '<a href="http://www.pcn.minambiente.it/PCNDYN/catalogowms.jsp?lan=it">AGEA 2009-2012</a>, <a href="http://www.pcn.minambiente.it/GN/">Geoportale Nazionale</a>'
+      });
+
+      // *** create EGEOS RealVista aerial layer (TILED) ... ***
+      var realVista = L.tileLayer.wms("http://213.215.135.196/reflector/open/service?", {
+       layers: 'rv1',
+       format: 'image/jpeg',
+       attribution: '<a href="http://openstreetmap.org">RealVista1.0 WMS OPEN</a> di <a href="http://openstreetmap.org">e-GEOS SpA</a> - CC BY SA'
+      });
+
+      // *** create OSM addresses tiles layer ... ***
+      //var tilesOSMAddressesUrl = 'http://localhost/MyTiles/CiviciOSM/{z}/{x}/{y}.png',
+      var tilesOSMAddressesUrl = 'Tiles/CiviciOSM/{z}/{x}/{y}.png',
+      tilesOSMAddressesLayer = new L.TileLayer(tilesOSMAddressesUrl,{ attribution: 'Elaborazione Cesare Gerbino' });
+
+      // *** create CiviciBibliotecheICCU tiles layer ... ***
+      //var tilesCiviciBibliotecheICCUUrl = 'http://localhost/MyTiles/CiviciBibliotecheICCU/{z}/{x}/{y}.png',
+      var tilesCiviciBibliotecheICCUUrl = 'Tiles/CiviciBibliotecheICCU/{z}/{x}/{y}.png',
+      tilesCiviciBibliotecheICCULayer = new L.TileLayer(tilesCiviciBibliotecheICCUUrl,{ attribution: 'Elaborazione Cesare Gerbino' });
+
+      // *** create CiviciSediINAIL tiles layer ... ***
+      //var tilesCiviciSediINAILUrl = 'http://localhost/MyTiles/CiviciSediINAIL/{z}/{x}/{y}.png',
+      var tilesCiviciSediINAILUrl = 'Tiles/CiviciSediINAIL/{z}/{x}/{y}.png',
+      tilesCiviciSediINAILLayer = new L.TileLayer(tilesCiviciSediINAILUrl,{ attribution: 'Elaborazione Cesare Gerbino' });
+
+      // *** create CiviciRegioneBasilicata tiles layer ... ***
+      //var tilesCiviciRegioneBasilicataUrl = 'http://localhost/MyTiles/CiviciRegioneBasilicata/{z}/{x}/{y}.png',
+      var tilesCiviciRegioneBasilicataUrl = 'Tiles/CiviciRegioneBasilicata/{z}/{x}/{y}.png',
+      tilesCiviciRegioneBasilicataLayer = new L.TileLayer(tilesCiviciRegioneBasilicataUrl,{ attribution: 'Elaborazione Cesare Gerbino' });
+
+      // *** create CiviciRegioneEmiliaRomagna tiles layer ... ***
+      //var tilesCiviciRegioneEmiliaRomagnaUrl = 'http://localhost/MyTiles/CiviciRegioneEmiliaRomagna/{z}/{x}/{y}.png',
+      var tilesCiviciRegioneEmiliaRomagnaUrl = 'Tiles/CiviciRegioneEmiliaRomagna/{z}/{x}/{y}.png',
+      tilesCiviciRegioneEmiliaRomagnaLayer = new L.TileLayer(tilesCiviciRegioneEmiliaRomagnaUrl,{ attribution: 'Elaborazione Cesare Gerbino' });
+
+      // *** create CiviciRegioneFriuliVeneziaGiulia tiles layer ... ***
+      //var tilesCiviciRegioneFriuliVeneziaGiuliaUrl = 'http://localhost/MyTiles/CiviciRegioneFriuliVeneziaGiulia/{z}/{x}/{y}.png',
+      var tilesCiviciRegioneFriuliVeneziaGiuliaUrl = 'Tiles/CiviciRegioneFriuliVeneziaGiulia/{z}/{x}/{y}.png',
+      tilesCiviciRegioneFriuliVeneziaGiuliaLayer = new L.TileLayer(tilesCiviciRegioneFriuliVeneziaGiuliaUrl,{ attribution: 'Elaborazione Cesare Gerbino' });
+
+      // *** create CiviciRegioneLombardia tiles layer ... ***
+      //var tilesCiviciRegioneLombardiaUrl = 'http://localhost/MyTiles/CiviciRegioneLombardia/{z}/{x}/{y}.png',
+      var tilesCiviciRegioneLombardiaUrl = 'Tiles/CiviciRegioneLombardia/{z}/{x}/{y}.png',
+      tilesCiviciRegioneLombardiaLayer = new L.TileLayer(tilesCiviciRegioneLombardiaUrl,{ attribution: 'Elaborazione Cesare Gerbino' });
+
+      // *** create CiviciRegioneMarche tiles layer ... ***
+      //var tilesCiviciRegioneMarcheUrl = 'http://localhost/MyTiles/CiviciRegioneMarche/{z}/{x}/{y}.png',
+      var tilesCiviciRegioneMarcheUrl = 'Tiles/CiviciRegioneMarche/{z}/{x}/{y}.png',
+      tilesCiviciRegioneMarcheLayer = new L.TileLayer(tilesCiviciRegioneMarcheUrl,{ attribution: 'Elaborazione Cesare Gerbino' });
+
+      // *** create CiviciRegionePiemonte tiles layer ... ***
+      //var tilesCiviciRegionePiemonteUrl = 'http://localhost/MyTiles/CiviciRegionePiemonte/{z}/{x}/{y}.png',
+      var tilesCiviciRegionePiemonteUrl = 'Tiles/CiviciRegionePiemonte/{z}/{x}/{y}.png',
+      tilesCiviciRegionePiemonteLayer = new L.TileLayer(tilesCiviciRegionePiemonteUrl,{ attribution: 'Elaborazione Cesare Gerbino' });
+
+      // *** create CiviciRegionePuglia tiles layer ... ***
+      //var tilesCiviciRegionePugliaUrl = 'http://localhost/MyTiles/CiviciRegionePuglia/{z}/{x}/{y}.png',
+      var tilesCiviciRegionePugliaUrl = 'Tiles/CiviciRegionePuglia/{z}/{x}/{y}.png',
+      tilesCiviciRegionePugliaLayer = new L.TileLayer(tilesCiviciRegionePugliaUrl,{ attribution: 'Elaborazione Cesare Gerbino' });
+
+      // *** create CiviciRegioneSardegna tiles layer ... ***
+      //var tilesCiviciRegioneSardegnaUrl = 'http://localhost/MyTiles/CiviciRegioneSardegna/{z}/{x}/{y}.png',
+      var tilesCiviciRegioneSardegnaUrl = 'Tiles/CiviciRegioneSardegna/{z}/{x}/{y}.png',
+      tilesCiviciRegioneSardegnaLayer = new L.TileLayer(tilesCiviciRegioneSardegnaUrl,{ attribution: 'Elaborazione Cesare Gerbino' });
+
+      // *** create CiviciRegioneSicilia tiles layer ... ***
+      //var tilesCiviciRegioneSiciliaUrl = 'http://localhost/MyTiles/CiviciRegioneSicilia/{z}/{x}/{y}.png',
+      var tilesCiviciRegioneSiciliaUrl = 'Tiles/CiviciRegioneSicilia/{z}/{x}/{y}.png',
+      tilesCiviciRegioneSiciliaLayer = new L.TileLayer(tilesCiviciRegioneSiciliaUrl,{ attribution: 'Elaborazione Cesare Gerbino' });
+
+      // *** create CiviciRegioneToscana tiles layer ... ***
+      //var tilesCiviciRegioneToscanaUrl = 'http://localhost/MyTiles/CiviciRegioneToscana/{z}/{x}/{y}.png',
+      var tilesCiviciRegioneToscanaUrl = 'Tiles/CiviciRegioneToscana/{z}/{x}/{y}.png',
+      tilesCiviciRegioneToscanaLayer = new L.TileLayer(tilesCiviciRegioneToscanaUrl,{ attribution: 'Elaborazione Cesare Gerbino' });
+
+      // *** create CiviciRegioneTrentino Alto Adige tiles layer ... ***
+      //var tilesCiviciRegioneTrentinoAltoAdigeUrl = 'http://localhost/MyTiles/CiviciRegioneTrentinoAltoAdige/{z}/{x}/{y}.png',
+      var tilesCiviciRegioneTrentinoAltoAdigeUrl = 'Tiles/CiviciRegioneTrentinoAltoAdige/{z}/{x}/{y}.png',
+      tilesCiviciRegioneTrentinoAltoAdigeLayer = new L.TileLayer(tilesCiviciRegioneTrentinoAltoAdigeUrl,{ attribution: 'Elaborazione Cesare Gerbino' });
+
+      // *** create CiviciRegioneUmbria tiles layer ... ***
+      //var tilesCiviciRegioneUmbriaUrl = 'http://localhost/MyTiles/CiviciRegioneUmbria/{z}/{x}/{y}.png',
+      var tilesCiviciRegioneUmbriaUrl = 'Tiles/CiviciRegioneUmbria/{z}/{x}/{y}.png',
+      tilesCiviciRegioneUmbriaLayer = new L.TileLayer(tilesCiviciRegioneUmbriaUrl,{ attribution: 'Elaborazione Cesare Gerbino' });
+
+      // *** create CiviciRegioneVeneto tiles layer ... ***
+      //var tilesCiviciRegioneVenetoUrl = 'http://localhost/MyTiles/CiviciRegioneVeneto/{z}/{x}/{y}.png',
+      var tilesCiviciRegioneVenetoUrl = 'Tiles/CiviciRegioneVeneto/{z}/{x}/{y}.png',
+      tilesCiviciRegioneVenetoLayer = new L.TileLayer(tilesCiviciRegioneVenetoUrl,{ attribution: 'Elaborazione Cesare Gerbino' });
+
+      // *** create Civici Geoportale Nazionale WMS layer ... ***
+      var civiciWmsPCN = L.tileLayer.wms("http://wms.pcn.minambiente.it/ogc?map=/ms_ogc/WMS_v1.3/Vettoriali/Numeri_Civici_2012.map", {
+            layers: 'IN.NUMERICIVICI.2012',
+            format: 'image/png',
+            transparent: true,
+            attribution: '<a href="http://www.pcn.minambiente.it/PCNDYN/catalogowms.jsp?lan=it">Numeri civici - Aggiornamento 2012</a>, <a href="http://www.pcn.minambiente.it/GN/">Geoportale Nazionale</a>'
+      });
+
+      // *** create Civici Geoportale Nazionale WFS layer (NOTE: initially empty)... ***
+      function onEachFeature(feature, layer) {
+           if (feature.properties && feature.properties.popupContent) {
+                   layer.bindPopup(feature.properties.popupContent);
+           }
+      };
+
+      addressPCN3 = L.geoJson(addressPCN2, {
+                                pointToLayer: function (feature, latlng) {
+                                                  return L.circleMarker(latlng, geojsonMarkerOptions);
+                                },
+                                onEachFeature: onEachFeature
+      });
+
+      addressPCN3.getAttribution = function () {return '<a href="http://www.pcn.minambiente.it/PCNDYN/catalogowms.jsp?lan=it">Numeri civici - Aggiornamento 2012</a>, <a href="http://www.pcn.minambiente.it/GN/">Geoportale Nazionale</a>'};
+
+      // *** inizialization search for addresses / places ... ***
+      var startPoint = [42, 12],
+      searchPoints = L.geoJson(null, {
+         onEachFeature: function (feature, layer) {
+             layer.bindPopup(feature.properties.name);
+         }
+      });
+      function showSearchPoints (geojson) {
+        searchPoints.clearLayers();
+        searchPoints.addData(geojson);
+      }
+
+      // *** create map object and controls ... ***
+      var map = new L.Map('map', {
+          center: [42, 12],
+          zoom: 6,
+          zoomControl: false,
+          layers: [osm]
+      });
+      var zoomControl = new L.Control.Zoom({position: 'topright'}).addTo(map);
+      searchPoints.addTo(map);
+
+      // *** add osmBuilding layer ... ***
+      var osmBuildingsLayer = new OSMBuildings(map).loadData();
+      map.removeLayer(osmBuildingsLayer);
+
+      // *** create base layers list ... ***
+      var baseLayers = {
+		   "OpenStreetMap": osm,
+		   "Ortofoto E_GEOS 2006 - 2009 (50 cm.) - RealVista 1.0 (Tile Open)": realVista,
+		   "Ortofoto AGEA 2009 - 2012 (50 cm.) - PCN (WMS)": pcnAgea
+      };
+
+      // *** create overlay layers list ... ***
+      var overlays = {
+    		"OSM Buildings": osmBuildingsLayer,
+    		"Numeri Civici in OpenStreetMap": tilesOSMAddressesLayer,
+    		"Numeri Civici in Regione Basilicata": tilesCiviciRegioneBasilicataLayer,
+      	"Numeri Civici Ist. Centr. Catalogo Unico Biblioteche (ICCU)": tilesCiviciBibliotecheICCULayer,
+      	"Numeri Civici Ist. Naz. Assic. Contro Infortuni sul Lavoro (INAIL)": tilesCiviciSediINAILLayer,
+    		"Numeri Civici in Regione Emilia Romagna": tilesCiviciRegioneEmiliaRomagnaLayer,
+    		"Numeri Civici in Regione Friuli Venezia Giulia": tilesCiviciRegioneFriuliVeneziaGiuliaLayer,
+    		"Numeri Civici in Regione Lombardia": tilesCiviciRegioneLombardiaLayer,
+    		"Numeri Civici in Regione Marche": tilesCiviciRegioneMarcheLayer,
+    		"Numeri Civici in Regione Piemonte": tilesCiviciRegionePiemonteLayer,
+    		"Numeri Civici in Regione Puglia": tilesCiviciRegionePugliaLayer,
+    		"Numeri Civici in Regione Sardegna": tilesCiviciRegioneSardegnaLayer,
+    		"Numeri Civici in Regione Sicilia": tilesCiviciRegioneSiciliaLayer,
+    		"Numeri Civici in Regione Toscana": tilesCiviciRegioneToscanaLayer,
+    		"Numeri Civici in Regione Trentino Alto Adige": tilesCiviciRegioneTrentinoAltoAdigeLayer,
+    		"Numeri Civici in Regione Umbria": tilesCiviciRegioneUmbriaLayer,
+    		"Numeri Civici in Regione Veneto": tilesCiviciRegioneVenetoLayer,
+    		"Civici Geoportale Nazionale - (WMS)": civiciWmsPCN,
+    		"Civici Geoportale Nazionale - (WFS)": addressPCN3
+      };
+
+      // *** add base layers and overlay layers list to map ... ***
+      TOC = L.control.layers(baseLayers, overlays);
+      TOC.addTo(map);
+
+      // *** add Civici Geoportale Nazionale - (WFS) if the zoom level >= 18 (and set isOnMap=1), otherwise alert ... ***
+      map.on('overlayadd', function(e) {
+                              if ((e.name == "Civici Geoportale Nazionale - (WFS)") && (map.getZoom() < 18)){
+                                map.removeLayer(addressPCN3);
+                                TOC.removeLayer(addressPCN3);
+                                alert('Per visualizzare il layer Civici Geoportale Nazionale - (WFS) e\' necessario visualizzare la mappa al massimo livello di dettaglio ...');
+                                TOC.addOverlay(addressPCN3, "Civici Geoportale Nazionale - (WFS)");
+                                isOnMap = 0;
+                              }
+                              if ((e.name == "Civici Geoportale Nazionale - (WFS)") && (map.getZoom() >= 18)){
+                                map.removeLayer(addressPCN3);
+                                TOC.removeLayer(addressPCN3);
+                                var currentExtent = map.getBounds().toBBoxString();
+                                invokeService(currentExtent);
+                              }
+                           });
+
+      // *** set isOnMap  =0 ... ***
+      map.on('overlayremove', function(e) {
+                                 if (e.name == "Civici Geoportale Nazionale - (WFS)"){
+                                   isOnMap = 0;
+                                 }
+                              });
+
+      // *** refresh map when drag the map and Civici Geoportale Nazionale - (WFS) is active and zoom laver >= 18 ... ***
+      map.on('dragend', function(e) {
+                           if ((map.getZoom() >= 18) && (isOnMap == 1)){
+                             map.removeLayer(addressPCN3);
+                             TOC.removeLayer(addressPCN3);
+                             var currentExtent = map.getBounds().toBBoxString();
+                             invokeService(currentExtent);
+                           }
+                        });
+
+      // *** remove Civici Geoportale Nazionale - (WFS) from the map and update TOC when zoom laver < 18 ... ***
+      map.on('zoomend', function(e) {
+                           if (map.getZoom() < 18) {
+                             map.removeLayer(addressPCN3);
+                             TOC.removeLayer(addressPCN3);
+                             TOC.addOverlay(addressPCN3, "Civici Geoportale Nazionale - (WFS)");
+                           }
+                        });
+
+      // *** invoke Geoportale Nazionale OGC WFS service, create a geoJSON and put it on the map ... ***
+      // *** check the browser ... ***
+      function invokeService (extent) {
+                   function addressPCN (addressList) {
+                         addressPCN = '{"type": "FeatureCollection","features":[';
+                         $xmlData = $.parseXML(addressList);
+                         $features = $('gml\\:featureMember, featureMember', $xmlData);
+                         $features.each(function () {
+                                   var $this = $(this);
+                                   addressPCN = addressPCN + '{"type": "Feature", "properties": { "popupContent": "' + $this.find('ms\\:nome, nome').text() + ' ' + $this.find('ms\\:civico, civico').text() + '", ' + '"show_on_map": true }, "geometry": { "type": "Point", "coordinates": [' + $this.find('gml\\:Point, Point').find('gml\\:coordinates, coordinates').text() + ']}},'
+                         });
+                         addressPCN = addressPCN + ']}';
+
+                         addressPCN1 = addressPCN.replace(',]}',']}');
+
+                         addressPCN2 = jQuery.parseJSON(addressPCN1);
+
+		         function onEachFeature(feature, layer) {
+		                  if (feature.properties && feature.properties.popupContent) {
+		                     layer.bindPopup(feature.properties.popupContent);
+		                  }
+                         }
+
+                         addressPCN3 = L.geoJson(addressPCN2, {
+                                         pointToLayer: function (feature, latlng) {
+                                                       return L.circleMarker(latlng, geojsonMarkerOptions);
+                                         },
+                                         attribution: '<a href="http://www.pcn.minambiente.it/PCNDYN/catalogowms.jsp?lan=it">Numeri civici - Aggiornamento 2012</a>, <a href="http://www.pcn.minambiente.it/GN/">Geoportale Nazionale</a>',
+                                         onEachFeature: onEachFeature
+                         });
+
+                         addressPCN3.getAttribution = function () {return '<a href="http://www.pcn.minambiente.it/PCNDYN/catalogowms.jsp?lan=it">Numeri civici - Aggiornamento 2012</a>, <a href="http://www.pcn.minambiente.it/GN/">Geoportale Nazionale</a>'};
+
+                         addressPCN3.addTo(map);
+                         TOC.addOverlay(addressPCN3, "Civici Geoportale Nazionale - (WFS)");
+                         isOnMap = 1;
+                   }
+
+		   var browser = navigator.userAgent.toLowerCase();
+		   var isIE = (browser.indexOf("msie")>-1 || browser.indexOf("trident")>-1);
+		   if (isIE && window.XDomainRequest) {
+		                if (window.XDomainRequest) {
+		                    var query = 'http://wms.pcn.minambiente.it/ogc?map=/ms_ogc/wfs/Numeri_Civici_2012.map&SERVICE=WFS&VERSION=1.0.0&REQUEST=GetFeature&TYPENAME=IN.NUMERICIVICI.2012&SRSNAME=EPSG:4326&bbox=' + extent + '&outputFormat=GML2';
+		                    var xdr = new XDomainRequest();
+		                    if (xdr) {
+		                        xdr.onload = function () {
+		                            addressPCN(xdr.responseText);
+		                        }
+		                        xdr.onerror = function () {
+		                            alert("KO");
+		                        }
+		                        xdr.open('GET', query);
+		                        xdr.send();
+		                    }
+		                }
+		    }
+		    else {
+		          var query = 'http://wms.pcn.minambiente.it/ogc?map=/ms_ogc/wfs/Numeri_Civici_2012.map&SERVICE=WFS&VERSION=1.0.0&REQUEST=GetFeature&TYPENAME=IN.NUMERICIVICI.2012&SRSNAME=EPSG:4326&bbox=' + extent + '&outputFormat=GML2';
+		          $.ajax({
+		                type: "GET",
+		                url: query,
+		                dataType: "text",
+		                crossDomain: true,
+		                success: function (data) {
+		                            addressPCN(data);
+		                },
+		                error: function (response, textStatus, errorThrown) {
+		                      alert("KO");
+		                      alert(errorThrown);
+		                }
+		          });
+		    }
+      }
+
+    </script>
+   <div id="infodiv" style="leaflet-popup-content-wrapper">
+       I dettagli relativi ai dati originali con le url di pubblicazione, di download, le licenze d'uso e di download dei dati elaborati usati per la creazione della mappa sono <a href="http://www.cesaregerbino.com/ItalyOpenAddresses/List/ItalyOpenAddressesList-V02.csv" target="link">scaricabili qui</a>.<br>
+       Maggiori dettagli <a href="https://cesaregerbino.wordpress.com/2015/02/04/numeri-civici-open-data-in-italia-disponibile-la-release-2-0-della-raccolta/" target="link">qui</a>
+   </div>
+</body>
+</html>
